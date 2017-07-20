@@ -6,7 +6,7 @@
 
 PainterWidget::PainterWidget(QWidget *parent) : QWidget(parent)
 {
-
+    //lineList_.append({QPoint(0, 0), QPoint(0, 50)});
 }
 
 void PainterWidget::drawPoint(QPainter &painter, QPoint pt)
@@ -84,18 +84,6 @@ void PainterWidget::drawLine_MiddlePoint(QPainter &painter, QLine line)
     QPoint p1 = line.p1();
     QPoint p2 = line.p2();
 
-    if (line.dx() == 0) {  // 斜率不存在
-        for (int i = qMin(p1.y(), p2.y()), j = qMax(p1.y(), p2.y()); i < j; ++i) {
-            painter.drawPoint(p1.x(), i);
-        }
-        return;
-    } else if (line.dx() == 0) { // 斜率为0
-        for (int i = qMin(p1.x(), p2.x()), j = qMax(p1.x(), p2.x()); i < j; ++i) {
-            painter.drawPoint(i, p1.y());
-        }
-        return;
-    }
-
     /*
      * 0 = Ax + By + C
      * A = y2 - y1 = dy
@@ -108,80 +96,78 @@ void PainterWidget::drawLine_MiddlePoint(QPainter &painter, QLine line)
     int B = p1.x() - p2.x();
     int C = p2.x() * p1.y() - p1.x() * p2.y();
 
-    if (A * p1.x() + B * (p1.y() + 1) + C < 0) {
-        A = -A;
-        B = -B;
-        C = -C;
-    }
+    int sign = (float)line.dy() * line.dx() > 0 ? 1 : -1;
 
-    float k = (float)line.dy() / line.dx();
-    if (k > 0) {
-        if (qAbs(line.dy()) <= qAbs(line.dx())) { // 0 < k <= 1
-            if (p1.x() > p2.x()) {
-                qSwap(p1, p2);
-            }
 
-            float currentY = p1.y();
-            float midDiscriminant = 0;
-            bool bFirstMidDiscriminant = true;
-            for (int i = p1.x(), j = p2.x(); i < j; ++i) {
-                painter.drawPoint(i, currentY);
-                //float midDiscriminant = A * i + B * (currentY + 0.5) + C;
-                if (Q_UNLIKELY(bFirstMidDiscriminant)) {
-                    //midDiscriminant = A + B * 0.5;
-                    midDiscriminant = (A << 1) + B;
-                    bFirstMidDiscriminant = false;
-                } else {
-                    if (midDiscriminant >= 0) {
-                        midDiscriminant += A << 1;
-                    } else {
-                        midDiscriminant += (A + B) << 1;
-                    }
-                }
+    if (qAbs(line.dy()) <= qAbs(line.dx())) { // |k| <= 1
+        if (A * p1.x() + B * (p1.y() + sign) + C < 0) {
+            A = -A;
+            B = -B;
+            C = -C;
+        }
+
+        if (p1.x() > p2.x()) {
+            qSwap(p1, p2);
+        }
+        int increaseB = sign * B;
+
+        float currentY = p1.y();
+        float midDiscriminant = 0;
+        bool bFirstMidDiscriminant = true;
+        for (int i = p1.x(), j = p2.x(); i < j; ++i) {
+            painter.drawPoint(i, currentY);
+            if (Q_UNLIKELY(bFirstMidDiscriminant)) {
+                //midDiscriminant = A + B * 0.5; 原先中点的第一次增量中含有0.5，但是只要判断符号，遂将判别式整体扩大2倍，消除浮点运算
+                midDiscriminant = (A << 1) + increaseB;
+                bFirstMidDiscriminant = false;
+            } else {
                 if (midDiscriminant >= 0) {
-                    currentY = currentY;
+                    midDiscriminant += A << 1;
                 } else {
-                    currentY = currentY + 1;
+                    midDiscriminant += (A + increaseB) << 1;
                 }
-
             }
-        } else {
+            if (midDiscriminant >= 0) {
+                currentY = currentY;
+            } else {
+                currentY = currentY + sign;
+            }
 
         }
     } else {
-        if (qAbs(line.dy()) <= qAbs(line.dx())) { // -1 <= k <0
-            if (p1.x() > p2.x()) {
-                qSwap(p1, p2);
-            }
+        if (A * (p1.x() + sign) + B * p1.y() + C < 0) {
+            A = -A;
+            B = -B;
+            C = -C;
+        }
 
-            float currentY = p1.y();
-            float midDiscriminant = 0;
-            bool bFirstMidDiscriminant = true;
-            for (int i = p1.x(), j = p2.x(); i < j; ++i) {
-                painter.drawPoint(i, currentY);
-                //float midDiscriminant = A * i + B * (currentY + 0.5) + C;
-                if (Q_UNLIKELY(bFirstMidDiscriminant)) {
-                    midDiscriminant = (A << 1) - B;
-                    bFirstMidDiscriminant = false;
-                } else {
-                    if (midDiscriminant >= 0) {
-                        midDiscriminant += (A - B) << 1;
-                    } else {
-                        midDiscriminant += A << 1;
-                    }
-                }
+        if (p1.y() > p2.y()) {
+            qSwap(p1, p2);
+        }
+
+        int increaseA = sign * A;
+        float currentX = p1.x();
+        float midDiscriminant = 0;
+        bool bFirstMidDiscriminant = true;
+        for (int i = p1.y(), j = p2.y(); i < j; ++i) {
+            painter.drawPoint(currentX, i);
+            if (Q_UNLIKELY(bFirstMidDiscriminant)) {
+                midDiscriminant = increaseA + (B << 1);
+                bFirstMidDiscriminant = false;
+            } else {
                 if (midDiscriminant >= 0) {
-                    currentY = currentY - 1;
+                    midDiscriminant += B << 1;
                 } else {
-                    currentY = currentY;
+                    midDiscriminant += (increaseA + B) << 1;
                 }
-
             }
-        } else {
-
+            if (midDiscriminant >= 0) {
+                currentX = currentX;
+            } else {
+                currentX = currentX + sign;
+            }
         }
     }
-
 }
 
 void PainterWidget::paintEvent(QPaintEvent *)
