@@ -3,6 +3,12 @@
 
 #include <QWidget>
 
+enum DrawLineType {
+    QtSource,
+    DDA,
+    MiddlePoint
+};
+
 class PainterWidget : public QWidget
 {
     Q_OBJECT
@@ -13,10 +19,13 @@ signals:
 
 public slots:
 private:
-    QList<QPair<QPoint, QPoint>> lineList_;
+    QList<QLine> lineList_;
     QPoint beforePoint_;
     void drawPoint(QPainter& painter, QPoint pt);
-    void drawLine(QPainter& painter, QPoint lpt, QPoint rpt);
+    void drawLine(QPainter& painter, QLine line, DrawLineType drawType = QtSource);
+
+    void drawLine_DDA(QPainter& painter, QLine line);
+    void drawLine_MiddlePoint(QPainter& painter, QLine line);
 
     // QWidget interface
 protected:
